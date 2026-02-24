@@ -1,0 +1,22 @@
+[Unit]
+Description=Chromium Kiosk Browser
+After=graphical-session.target
+
+[Service]
+Environment=WAYLAND_DISPLAY=wayland-1
+ExecStart=/usr/bin/chromium-browser \
+  --kiosk \
+  --ozone-platform=wayland \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  --disable-translate \
+  --disable-features=TranslateUI \
+  --disk-cache-dir=/dev/null \
+  --check-for-update-interval=31536000 \
+  {{KIOSK_URL}}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
