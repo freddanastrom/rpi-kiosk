@@ -13,6 +13,7 @@ apt-get full-upgrade -y
 apt-get install -y \
     chromium \
     wayvnc \
+    wlr-randr \
     unclutter \
     network-manager \
     raspi-config \

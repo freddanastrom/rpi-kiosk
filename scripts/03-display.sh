@@ -11,22 +11,19 @@ KIOSK_HOME=$(getent passwd "${KIOSK_USER}" | cut -d: -f6)
 
 echo "[03] Konfigurerar skärm (rotation: ${DISPLAY_ROTATION})..."
 
-# ─── Display rotation i config.txt ───────────────────────────────────────────
+# ─── GPU-minne i config.txt ───────────────────────────────────────────────────
+# Rotation hanteras av wlr-randr i Wayland-sessionen (se autostart).
 
-if grep -q "^display_rotate=" "$CONFIG_TXT"; then
-    sed -i "s/^display_rotate=.*/display_rotate=${DISPLAY_ROTATION}/" "$CONFIG_TXT"
-else
-    echo "display_rotate=${DISPLAY_ROTATION}" >> "$CONFIG_TXT"
-fi
-
-# GPU-minne (minst 128MB för grafik)
 if grep -q "^gpu_mem=" "$CONFIG_TXT"; then
     sed -i "s/^gpu_mem=.*/gpu_mem=128/" "$CONFIG_TXT"
 else
     echo "gpu_mem=128" >> "$CONFIG_TXT"
 fi
 
-echo "[03] config.txt: display_rotate=${DISPLAY_ROTATION}, gpu_mem=128"
+# Ta bort eventuell gammal display_rotate (kan ge dubbelrotation med wlr-randr)
+sed -i '/^display_rotate=/d' "$CONFIG_TXT"
+
+echo "[03] config.txt: gpu_mem=128 (rotation via wlr-randr i Wayland)"
 
 # ─── Inaktivera console blanking i cmdline.txt ───────────────────────────────
 

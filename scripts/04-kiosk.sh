@@ -16,6 +16,7 @@ mkdir -p "$LABWC_DIR"
 # Generera autostart från template
 sed \
     -e "s|{{VNC_ENABLED}}|${VNC_ENABLED}|g" \
+    -e "s|{{DISPLAY_ROTATION}}|${DISPLAY_ROTATION}|g" \
     "${SCRIPT_DIR}/templates/autostart.sh" \
     > "$AUTOSTART"
 

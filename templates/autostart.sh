@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
-# labwc autostart — körs vid start av Wayland-sessionen
+# labwc autostart — körs när Wayland-sessionen startar
 
-# Dölj muspekaren efter 1 sekund
+# XDG_RUNTIME_DIR krävs för systemctl --user och wayvnc
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+# Importera display-miljön till systemd user manager så att
+# chromium-kiosk.service ärver WAYLAND_DISPLAY automatiskt
+systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+
+# ─── Skärmrotation ────────────────────────────────────────────────────────────
+# Utförs via wlr-randr (Wayland-nativt, fungerar med labwc/wlroots)
+if [[ "{{DISPLAY_ROTATION}}" != "0" ]]; then
+    OUTPUT=$(wlr-randr 2>/dev/null | awk 'NR==1{print $1}')
+    wlr-randr --output "${OUTPUT:-HDMI-A-1}" --transform "{{DISPLAY_ROTATION}}" 2>/dev/null || true
+fi
+
+# ─── Dölj muspekaren ──────────────────────────────────────────────────────────
 unclutter --timeout 1 &
 
-# Starta Chromium via systemd user service (med watchdog)
+# ─── Starta Chromium via systemd watchdog-tjänst ──────────────────────────────
 systemctl --user start chromium-kiosk.service
 
-# Starta VNC om aktiverat
+# ─── VNC (om aktiverat) ───────────────────────────────────────────────────────
 if [[ "{{VNC_ENABLED}}" == "true" ]]; then
     wayvnc &
 fi

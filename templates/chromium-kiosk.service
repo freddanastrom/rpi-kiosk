@@ -3,7 +3,7 @@ Description=Chromium Kiosk Browser
 After=graphical-session.target
 
 [Service]
-Environment=WAYLAND_DISPLAY=wayland-1
+Environment=WAYLAND_DISPLAY=wayland-0
 ExecStart=/usr/bin/chromium \
   --kiosk \
   --ozone-platform=wayland \
