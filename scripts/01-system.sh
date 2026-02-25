@@ -14,6 +14,7 @@ apt-get install -y \
     chromium \
     wayvnc \
     wlr-randr \
+    swaybg \
     unclutter \
     network-manager \
     raspi-config \

@@ -12,6 +12,7 @@ ExecStart=/usr/bin/chromium \
   --no-first-run \
   --disable-translate \
   --disable-features=TranslateUI \
+  --password-store=basic \
   --disk-cache-dir=/dev/null \
   --check-for-update-interval=31536000 \
   {{KIOSK_URL}}

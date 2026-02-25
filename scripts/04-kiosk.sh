@@ -57,4 +57,15 @@ EOF
     echo "[04] labwc-start lagt till i ${BASH_PROFILE}"
 fi
 
+# ─── Inaktivera nm-applet XDG-autostart ──────────────────────────────────────
+# nm-applet visar WiFi-autentiseringsdialog i kiosk-läge
+KIOSK_AUTOSTART_DIR="${KIOSK_HOME}/.config/autostart"
+mkdir -p "$KIOSK_AUTOSTART_DIR"
+cat > "${KIOSK_AUTOSTART_DIR}/nm-applet.desktop" <<EOF
+[Desktop Entry]
+Hidden=true
+EOF
+chown -R "${KIOSK_USER}:${KIOSK_USER}" "$KIOSK_AUTOSTART_DIR"
+echo "[04] nm-applet XDG-autostart inaktiverad"
+
 echo "[04] Kiosk-konfiguration klar."
