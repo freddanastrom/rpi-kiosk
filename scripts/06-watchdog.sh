@@ -37,4 +37,15 @@ sudo -u "${KIOSK_USER}" \
     systemctl --user enable chromium-kiosk.service 2>/dev/null || \
     echo "[06] OBS: Kunde inte aktivera tjänsten nu (görs automatiskt vid inloggning)"
 
+# ─── Chromium policy: inaktivera translate permanent ─────────────────────────
+# Managed policy tar precedens över flaggor och användarinställningar.
+POLICY_DIR="/etc/chromium/policies/managed"
+mkdir -p "$POLICY_DIR"
+cat > "${POLICY_DIR}/kiosk.json" <<'EOF'
+{
+  "TranslateEnabled": false
+}
+EOF
+echo "[06] Chromium-policy: TranslateEnabled=false"
+
 echo "[06] Watchdog-konfiguration klar."
