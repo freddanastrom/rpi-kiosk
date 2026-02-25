@@ -21,9 +21,6 @@ pkill -f polkit-gnome-authentication-agent 2>/dev/null || true
 # persistent via wlr-output-management-protokollet
 kanshi &
 
-# ─── Dölj muspekaren ──────────────────────────────────────────────────────────
-unclutter --timeout 1 &
-
 # ─── Starta Chromium via systemd watchdog-tjänst ──────────────────────────────
 systemctl --user start chromium-kiosk.service
 

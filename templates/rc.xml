@@ -1,5 +1,10 @@
 <?xml version="1.0"?>
 <labwc_config>
+  <pointer>
+    <!-- Osynlig markörtema — markören är skapad av deploy-scriptet -->
+    <theme>invisible</theme>
+    <size>1</size>
+  </pointer>
   <keyboard>
     <!-- Öppna terminal: Ctrl+Alt+T -->
     <keybind key="C-A-t">

@@ -17,7 +17,6 @@ apt-get install -y \
     kanshi \
     swaybg \
     foot \
-    unclutter \
     network-manager \
     raspi-config \
     curl \

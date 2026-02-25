@@ -10,8 +10,7 @@ ExecStart=/usr/bin/chromium \
   --noerrdialogs \
   --disable-infobars \
   --no-first-run \
-  --disable-translate \
-  --disable-features=TranslateUI \
+  --disable-features=TranslateUI,Translate \
   --password-store=basic \
   --disk-cache-dir=/dev/null \
   --check-for-update-interval=31536000 \

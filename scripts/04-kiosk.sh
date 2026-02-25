@@ -25,10 +25,62 @@ chmod +x "$AUTOSTART"
 # Kopiera labwc-konfiguration (tangentbordskortkommandon)
 cp "${SCRIPT_DIR}/templates/rc.xml" "${LABWC_DIR}/rc.xml"
 
+# labwc environment: sätt osynlig markörtema för kompositorn och alla klienter
+cat > "${LABWC_DIR}/environment" <<'EOF'
+XCURSOR_THEME=invisible
+XCURSOR_SIZE=1
+EOF
+
 chown -R "${KIOSK_USER}:${KIOSK_USER}" "$LABWC_DIR"
+
+# ─── Osynlig markörtema ───────────────────────────────────────────────────────
+# Skapar en minimal XCursor-fil (1x1 transparent) som fungerar på ren Wayland.
+# unclutter fungerar ej på Wayland — composer + XCURSOR_THEME hanterar detta.
+ICON_DIR="${KIOSK_HOME}/.local/share/icons/invisible"
+CURSOR_DIR="${ICON_DIR}/cursors"
+mkdir -p "$CURSOR_DIR"
+
+XCURSOR_TARGET="$CURSOR_DIR" python3 <<'PYEOF'
+import struct, os
+
+cursor_dir = os.environ['XCURSOR_TARGET']
+
+# XCursor-format: filhuvud + TOC + bildchunk (1x1 transparent ARGB)
+file_header = b'Xcur' + struct.pack('<III', 16, 0x10000, 1)
+toc          = struct.pack('<III', 0xFFFD0002, 1, 28)
+chunk        = struct.pack('<IIIIIIIII', 36, 0xFFFD0002, 1, 1, 1, 1, 0, 0, 50)
+pixels       = b'\x00\x00\x00\x00'
+
+with open(os.path.join(cursor_dir, 'default'), 'wb') as f:
+    f.write(file_header + toc + chunk + pixels)
+
+names = [
+    'left_ptr', 'right_ptr', 'top_left_arrow', 'cross', 'crosshair',
+    'hand1', 'hand2', 'pointer', 'watch', 'wait', 'progress',
+    'xterm', 'text', 'vertical-text', 'sb_h_double_arrow',
+    'sb_v_double_arrow', 'fleur', 'move', 'all-scroll', 'not-allowed',
+    'no-drop', 'help', 'n-resize', 's-resize', 'e-resize', 'w-resize',
+    'ne-resize', 'sw-resize', 'nw-resize', 'se-resize', 'nesw-resize',
+    'nwse-resize', 'ew-resize', 'ns-resize', 'col-resize', 'row-resize',
+    'copy', 'alias', 'cell', 'grab', 'grabbing', 'zoom-in', 'zoom-out',
+    'context-menu', 'up-arrow', 'size_all',
+]
+for name in names:
+    path = os.path.join(cursor_dir, name)
+    if not os.path.exists(path):
+        os.symlink('default', path)
+PYEOF
+
+cat > "${ICON_DIR}/index.theme" <<'EOF'
+[Icon Theme]
+Name=invisible
+EOF
+
+chown -R "${KIOSK_USER}:${KIOSK_USER}" "${KIOSK_HOME}/.local"
 
 echo "[04] Skapad: $AUTOSTART"
 echo "[04] Skapad: ${LABWC_DIR}/rc.xml (Ctrl+Alt+T öppnar terminal)"
+echo "[04] Skapad: osynlig markörtema (~/.local/share/icons/invisible)"
 
 # ─── Aktivera autologin för KIOSK_USER ───────────────────────────────────────
 
