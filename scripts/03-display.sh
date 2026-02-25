@@ -23,7 +23,29 @@ fi
 # Ta bort eventuell gammal display_rotate (kan ge dubbelrotation med wlr-randr)
 sed -i '/^display_rotate=/d' "$CONFIG_TXT"
 
-echo "[03] config.txt: gpu_mem=128 (rotation via wlr-randr i Wayland)"
+echo "[03] config.txt: gpu_mem=128"
+
+# ─── kanshi output-konfiguration ─────────────────────────────────────────────
+# kanshi är en wlr-output-management-klient som håller output-konfigurationen
+# persistent — mer tillförlitligt än att köra wlr-randr direkt i autostart.
+
+# Konvertera rotation: 0 → normal, övriga behålls som-är (90, 180, 270)
+case "${DISPLAY_ROTATION}" in
+    0) KANSHI_TRANSFORM="normal" ;;
+    *) KANSHI_TRANSFORM="${DISPLAY_ROTATION}" ;;
+esac
+
+KANSHI_DIR="${KIOSK_HOME}/.config/kanshi"
+mkdir -p "$KANSHI_DIR"
+
+cat > "${KANSHI_DIR}/config" <<EOF
+profile {
+    output * transform ${KANSHI_TRANSFORM}
+}
+EOF
+
+chown -R "${KIOSK_USER}:${KIOSK_USER}" "$KANSHI_DIR"
+echo "[03] kanshi config: transform=${KANSHI_TRANSFORM}"
 
 # ─── Inaktivera console blanking i cmdline.txt ───────────────────────────────
 

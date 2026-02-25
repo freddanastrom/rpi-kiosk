@@ -16,16 +16,10 @@ swaybg -c '#000000' -m solid_color &
 pkill -f nm-applet 2>/dev/null || true
 pkill -f polkit-gnome-authentication-agent 2>/dev/null || true
 
-# ─── Skärmrotation ────────────────────────────────────────────────────────────
-# Körs i bakgrunden med fördröjning — labwc återinitierar outputs efter
-# autostart och nollställer annars rotationen direkt
-if [[ "{{DISPLAY_ROTATION}}" != "0" ]]; then
-    (
-        sleep 2
-        OUTPUT=$(wlr-randr 2>/dev/null | awk 'NR==1{print $1}')
-        wlr-randr --output "${OUTPUT:-HDMI-A-1}" --transform "{{DISPLAY_ROTATION}}"
-    ) &
-fi
+# ─── Skärmrotation via kanshi ─────────────────────────────────────────────────
+# kanshi läser ~/.config/kanshi/config och håller output-konfigurationen
+# persistent via wlr-output-management-protokollet
+kanshi &
 
 # ─── Dölj muspekaren ──────────────────────────────────────────────────────────
 unclutter --timeout 1 &

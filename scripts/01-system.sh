@@ -14,6 +14,7 @@ apt-get install -y \
     chromium \
     wayvnc \
     wlr-randr \
+    kanshi \
     swaybg \
     foot \
     unclutter \
