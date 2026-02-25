@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <keyboard>
+    <!-- Öppna terminal: Ctrl+Alt+T -->
+    <keybind key="C-A-t">
+      <action name="Execute">
+        <command>foot</command>
+      </action>
+    </keybind>
+  </keyboard>
+</labwc_config>

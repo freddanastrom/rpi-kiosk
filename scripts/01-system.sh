@@ -15,6 +15,7 @@ apt-get install -y \
     wayvnc \
     wlr-randr \
     swaybg \
+    foot \
     unclutter \
     network-manager \
     raspi-config \

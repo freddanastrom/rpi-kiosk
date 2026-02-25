@@ -21,9 +21,14 @@ sed \
     > "$AUTOSTART"
 
 chmod +x "$AUTOSTART"
+
+# Kopiera labwc-konfiguration (tangentbordskortkommandon)
+cp "${SCRIPT_DIR}/templates/rc.xml" "${LABWC_DIR}/rc.xml"
+
 chown -R "${KIOSK_USER}:${KIOSK_USER}" "$LABWC_DIR"
 
 echo "[04] Skapad: $AUTOSTART"
+echo "[04] Skapad: ${LABWC_DIR}/rc.xml (Ctrl+Alt+T öppnar terminal)"
 
 # ─── Aktivera autologin för KIOSK_USER ───────────────────────────────────────
 
