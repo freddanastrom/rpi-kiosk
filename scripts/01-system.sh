@@ -11,7 +11,7 @@ apt-get update -qq
 apt-get full-upgrade -y
 
 apt-get install -y \
-    chromium-browser \
+    chromium \
     wayvnc \
     unclutter \
     network-manager \

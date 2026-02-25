@@ -4,7 +4,7 @@ After=graphical-session.target
 
 [Service]
 Environment=WAYLAND_DISPLAY=wayland-1
-ExecStart=/usr/bin/chromium-browser \
+ExecStart=/usr/bin/chromium \
   --kiosk \
   --ozone-platform=wayland \
   --noerrdialogs \

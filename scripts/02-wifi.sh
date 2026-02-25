@@ -7,6 +7,13 @@ source "${SCRIPT_DIR}/config.env"
 
 echo "[02] Konfigurerar WiFi (SSID: ${WIFI_SSID})..."
 
+# Hoppa över om Pi redan är ansluten till rätt SSID
+current_ssid=$(nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 || true)
+if [[ "$current_ssid" == "$WIFI_SSID" ]]; then
+    echo "[02] Redan ansluten till ${WIFI_SSID}, hoppar över WiFi-konfiguration."
+    exit 0
+fi
+
 NM_CONN_DIR="/etc/NetworkManager/system-connections"
 CONN_FILE="${NM_CONN_DIR}/${WIFI_SSID}.nmconnection"
 
