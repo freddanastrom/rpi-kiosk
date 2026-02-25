@@ -4,6 +4,33 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.env"
 
+# Sökväg till sentinel-fil som markerar att initial deploy är gjord
+DEPLOYED_MARKER="/etc/rpi-kiosk.deployed"
+
+# ─── Hjälptext ───────────────────────────────────────────────────────────────
+
+usage() {
+    cat <<EOF
+Användning:
+  sudo ./deploy.sh                    Fullständig deploy (första gången)
+  sudo ./deploy.sh --update           Uppdatera alla inställningar från config.env
+  sudo ./deploy.sh --update <modul>   Uppdatera en specifik del
+
+Moduler:
+  wifi      WiFi-anslutning (02-wifi.sh)
+  display   Skärmrotation och blanking (03-display.sh)
+  kiosk     labwc autostart (04-kiosk.sh)
+  vnc       wayvnc-konfiguration (05-vnc.sh)
+  watchdog  Chromium systemd-tjänst (06-watchdog.sh)
+
+Exempel:
+  sudo ./deploy.sh --update wifi
+  sudo ./deploy.sh --update watchdog
+  sudo ./deploy.sh --update wifi watchdog
+EOF
+    exit 0
+}
+
 # ─── Checks ──────────────────────────────────────────────────────────────────
 
 check_root() {
@@ -51,23 +78,73 @@ check_config() {
     fi
 }
 
-# ─── Main ────────────────────────────────────────────────────────────────────
+# ─── Tjänstomstart efter uppdatering ─────────────────────────────────────────
 
-main() {
-    echo "╔══════════════════════════════════════╗"
-    echo "║   Raspberry Pi Kiosk Deploy System   ║"
-    echo "╚══════════════════════════════════════╝"
-    echo ""
+# Returnerar 0 om omstart krävs, 1 om tjänster hanterades direkt
+restart_services() {
+    local modules=("$@")
+    local needs_reboot=false
+    local KIOSK_HOME
+    KIOSK_HOME=$(getent passwd "${KIOSK_USER}" | cut -d: -f6)
+    local KIOSK_UID
+    KIOSK_UID=$(id -u "${KIOSK_USER}")
 
-    check_root
-    check_architecture
-    check_rpi_hardware
-    check_config
+    for module in "${modules[@]}"; do
+        case "$module" in
+            wifi)
+                echo "  Laddar om NetworkManager..."
+                systemctl reload-or-restart NetworkManager
+                sleep 2
+                nmcli connection up "${WIFI_SSID}" 2>/dev/null && \
+                    echo "  WiFi återansluten: ${WIFI_SSID}" || \
+                    echo "  INFO: WiFi-anslutning görs vid nästa start."
+                ;;
+            display)
+                echo "  Skärmändringar kräver omstart."
+                needs_reboot=true
+                ;;
+            kiosk)
+                echo "  Startar om labwc-session..."
+                sudo -u "${KIOSK_USER}" \
+                    XDG_RUNTIME_DIR="/run/user/${KIOSK_UID}" \
+                    WAYLAND_DISPLAY=wayland-1 \
+                    pkill labwc 2>/dev/null && \
+                    echo "  labwc startas om automatiskt via autologin." || \
+                    echo "  INFO: labwc körs inte nu; ny autostart används vid nästa inloggning."
+                ;;
+            vnc)
+                echo "  Startar om wayvnc..."
+                sudo -u "${KIOSK_USER}" \
+                    XDG_RUNTIME_DIR="/run/user/${KIOSK_UID}" \
+                    pkill wayvnc 2>/dev/null || true
+                sudo -u "${KIOSK_USER}" \
+                    XDG_RUNTIME_DIR="/run/user/${KIOSK_UID}" \
+                    WAYLAND_DISPLAY=wayland-1 \
+                    nohup wayvnc >/dev/null 2>&1 &
+                echo "  wayvnc omstartad."
+                ;;
+            watchdog)
+                echo "  Laddar om och startar om chromium-kiosk..."
+                sudo -u "${KIOSK_USER}" \
+                    XDG_RUNTIME_DIR="/run/user/${KIOSK_UID}" \
+                    systemctl --user daemon-reload
+                sudo -u "${KIOSK_USER}" \
+                    XDG_RUNTIME_DIR="/run/user/${KIOSK_UID}" \
+                    systemctl --user restart chromium-kiosk.service
+                echo "  chromium-kiosk omstartad."
+                ;;
+        esac
+    done
 
-    # Läs in konfiguration
-    # shellcheck source=config.env
-    source "$CONFIG_FILE"
+    if [[ "$needs_reboot" == "true" ]]; then
+        return 0
+    fi
+    return 1
+}
 
+# ─── Körlägen ────────────────────────────────────────────────────────────────
+
+run_full_deploy() {
     echo ""
     echo "Konfiguration:"
     echo "  KIOSK_URL:        ${KIOSK_URL}"
@@ -79,10 +156,8 @@ main() {
 
     read -rp "Starta deploy med dessa inställningar? [y/N] " confirm
     [[ "$confirm" =~ ^[yY]$ ]] || { echo "Avbröt."; exit 0; }
-
     echo ""
 
-    # Kör varje script i ordning
     local scripts=(
         "01-system.sh"
         "02-wifi.sh"
@@ -103,11 +178,13 @@ main() {
         echo ""
     done
 
+    # Spara sentinel
+    date -Iseconds > "$DEPLOYED_MARKER"
+
     echo "╔══════════════════════════════════════╗"
     echo "║         Deploy klar!                 ║"
     echo "╚══════════════════════════════════════╝"
     echo ""
-    echo "Nästa steg:"
     echo "  En omstart krävs för att alla ändringar ska träda i kraft."
     echo ""
     read -rp "Starta om nu? [y/N] " reboot_confirm
@@ -117,6 +194,120 @@ main() {
     else
         echo "Kom ihåg att starta om: sudo reboot"
     fi
+}
+
+run_update() {
+    local requested_modules=("$@")
+
+    # Mappa modulnamn → scriptnummer
+    declare -A MODULE_SCRIPT=(
+        [wifi]="02-wifi.sh"
+        [display]="03-display.sh"
+        [kiosk]="04-kiosk.sh"
+        [vnc]="05-vnc.sh"
+        [watchdog]="06-watchdog.sh"
+    )
+
+    # Validera modulnamn
+    for m in "${requested_modules[@]}"; do
+        if [[ -z "${MODULE_SCRIPT[$m]+_}" ]]; then
+            echo "ERROR: Okänd modul: '$m'" >&2
+            echo "Giltiga moduler: ${!MODULE_SCRIPT[*]}" >&2
+            exit 1
+        fi
+    done
+
+    echo ""
+    echo "Konfiguration:"
+    echo "  KIOSK_URL:        ${KIOSK_URL}"
+    echo "  KIOSK_USER:       ${KIOSK_USER}"
+    echo "  DISPLAY_ROTATION: ${DISPLAY_ROTATION}"
+    echo "  WIFI_SSID:        ${WIFI_SSID}"
+    echo "  VNC_ENABLED:      ${VNC_ENABLED}"
+    echo ""
+    echo "Uppdaterar moduler: ${requested_modules[*]}"
+    echo ""
+    read -rp "Fortsätt? [y/N] " confirm
+    [[ "$confirm" =~ ^[yY]$ ]] || { echo "Avbröt."; exit 0; }
+    echo ""
+
+    for module in "${requested_modules[@]}"; do
+        local script="${MODULE_SCRIPT[$module]}"
+        local script_path="${SCRIPT_DIR}/scripts/${script}"
+        echo "━━━ Kör: $script ━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        bash "$script_path"
+        echo ""
+    done
+
+    echo "━━━ Startar om berörda tjänster ━━━━━━━━━━━━━━"
+    if restart_services "${requested_modules[@]}"; then
+        echo ""
+        echo "Ändringar kräver omstart för att träda i kraft."
+        read -rp "Starta om nu? [y/N] " reboot_confirm
+        if [[ "$reboot_confirm" =~ ^[yY]$ ]]; then
+            echo "Startar om..."
+            reboot
+        else
+            echo "Kom ihåg att starta om: sudo reboot"
+        fi
+    else
+        echo ""
+        echo "Uppdatering klar. Tjänster omstartade."
+    fi
+}
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+main() {
+    echo "╔══════════════════════════════════════╗"
+    echo "║   Raspberry Pi Kiosk Deploy System   ║"
+    echo "╚══════════════════════════════════════╝"
+
+    check_root
+    check_config
+
+    # shellcheck source=config.env
+    source "$CONFIG_FILE"
+
+    # Parsea argument
+    local mode="full"
+    local modules=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --update)
+                mode="update"
+                shift
+                while [[ $# -gt 0 ]] && [[ "$1" != --* ]]; do
+                    modules+=("$1")
+                    shift
+                done
+                ;;
+            --help|-h)
+                usage
+                ;;
+            *)
+                echo "ERROR: Okänt argument: $1" >&2
+                usage
+                ;;
+        esac
+    done
+
+    # Standardmoduler för --update utan specificerade moduler
+    if [[ "$mode" == "update" ]] && [[ ${#modules[@]} -eq 0 ]]; then
+        modules=(wifi display kiosk vnc watchdog)
+    fi
+
+    case "$mode" in
+        full)
+            check_architecture
+            check_rpi_hardware
+            run_full_deploy
+            ;;
+        update)
+            run_update "${modules[@]}"
+            ;;
+    esac
 }
 
 main "$@"
