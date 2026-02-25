@@ -27,6 +27,10 @@ Exempel:
   sudo ./deploy.sh --update wifi
   sudo ./deploy.sh --update watchdog
   sudo ./deploy.sh --update wifi watchdog
+
+OBS: Om read-only läge är aktivt inaktiveras det automatiskt, varefter
+en omstart krävs. Kör samma kommando igen efter omstarten.
+Read-only läge återaktiveras automatiskt efter varje uppdatering.
 EOF
     exit 0
 }
@@ -76,6 +80,12 @@ check_config() {
         echo "  nano config.env" >&2
         exit 1
     fi
+}
+
+# ─── Overlayfs-hjälpfunktion ─────────────────────────────────────────────────
+
+overlayfs_active() {
+    findmnt -n -o FSTYPE / 2>/dev/null | grep -q "^overlay$"
 }
 
 # ─── Tjänstomstart efter uppdatering ─────────────────────────────────────────
@@ -165,6 +175,7 @@ run_full_deploy() {
         "04-kiosk.sh"
         "05-vnc.sh"
         "06-watchdog.sh"
+        "07-readonly.sh"
     )
 
     for script in "${scripts[@]}"; do
@@ -198,6 +209,21 @@ run_full_deploy() {
 
 run_update() {
     local requested_modules=("$@")
+
+    # ─── Overlayfs-kontroll ───────────────────────────────────────────────────
+    if overlayfs_active; then
+        echo ""
+        echo "Read-only läge (overlayfs) är aktivt."
+        echo "Inaktiverar för att tillåta skrivning till SD-kortet..."
+        raspi-config nonint disable_overlayfs
+        echo ""
+        echo "Read-only inaktiverat. Starta om och kör sedan samma kommando igen:"
+        echo "  sudo ./deploy.sh --update ${requested_modules[*]}"
+        echo ""
+        read -rp "Starta om nu? [Y/n] " confirm
+        [[ "$confirm" =~ ^[nN]$ ]] || reboot
+        exit 0
+    fi
 
     # Mappa modulnamn → scriptnummer
     declare -A MODULE_SCRIPT=(
@@ -240,20 +266,17 @@ run_update() {
     done
 
     echo "━━━ Startar om berörda tjänster ━━━━━━━━━━━━━━"
-    if restart_services "${requested_modules[@]}"; then
-        echo ""
-        echo "Ändringar kräver omstart för att träda i kraft."
-        read -rp "Starta om nu? [y/N] " reboot_confirm
-        if [[ "$reboot_confirm" =~ ^[yY]$ ]]; then
-            echo "Startar om..."
-            reboot
-        else
-            echo "Kom ihåg att starta om: sudo reboot"
-        fi
-    else
-        echo ""
-        echo "Uppdatering klar. Tjänster omstartade."
-    fi
+    restart_services "${requested_modules[@]}" || true
+    echo ""
+
+    echo "━━━ Aktiverar read-only läge ━━━━━━━━━━━━━━━━"
+    bash "${SCRIPT_DIR}/scripts/07-readonly.sh"
+    echo ""
+
+    echo "Uppdatering klar. Starta om för att aktivera read-only läge."
+    read -rp "Starta om nu? [Y/n] " reboot_confirm
+    [[ "$reboot_confirm" =~ ^[nN]$ ]] || reboot
+    echo "Kom ihåg att starta om: sudo reboot"
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
