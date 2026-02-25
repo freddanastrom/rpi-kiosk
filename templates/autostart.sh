@@ -19,8 +19,14 @@ pkill -f polkit-gnome-authentication-agent 2>/dev/null || true
 # ─── Skärmrotation ────────────────────────────────────────────────────────────
 # Utförs via wlr-randr (Wayland-nativt, fungerar med labwc/wlroots)
 if [[ "{{DISPLAY_ROTATION}}" != "0" ]]; then
-    OUTPUT=$(wlr-randr 2>/dev/null | awk 'NR==1{print $1}')
-    wlr-randr --output "${OUTPUT:-HDMI-A-1}" --transform "{{DISPLAY_ROTATION}}" 2>/dev/null || true
+    # Vänta tills kompositorn är redo och wlr-randr kan lista outputs
+    OUTPUT=""
+    for _ in {1..10}; do
+        OUTPUT=$(wlr-randr 2>/dev/null | awk 'NR==1{print $1}')
+        [[ -n "$OUTPUT" ]] && break
+        sleep 0.5
+    done
+    wlr-randr --output "${OUTPUT:-HDMI-A-1}" --transform "{{DISPLAY_ROTATION}}"
 fi
 
 # ─── Dölj muspekaren ──────────────────────────────────────────────────────────
