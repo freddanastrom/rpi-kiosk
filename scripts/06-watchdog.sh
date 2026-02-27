@@ -48,4 +48,30 @@ cat > "${POLICY_DIR}/kiosk.json" <<'EOF'
 EOF
 echo "[06] Chromium-policy: TranslateEnabled=false"
 
+# ─── Daglig omstart 05:00 via systemd timer ──────────────────────────────────
+cat > /etc/systemd/system/kiosk-reboot.service <<'EOF'
+[Unit]
+Description=Daily kiosk reboot
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/reboot
+EOF
+
+cat > /etc/systemd/system/kiosk-reboot.timer <<'EOF'
+[Unit]
+Description=Daily kiosk reboot at 05:00
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable kiosk-reboot.timer
+echo "[06] Daglig omstart aktiverad: 05:00"
+
 echo "[06] Watchdog-konfiguration klar."
