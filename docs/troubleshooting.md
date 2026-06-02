@@ -1,5 +1,37 @@
 # Felsökning
 
+## Bootloop / fastnar vid start (read-only / overlayfs)
+
+Om Pi:n hamnar i en omstartsloop efter att read-only läge aktiverats kan du
+inte nå en shell på enheten. Bryt loopen genom att redigera SD-kortet från en
+annan dator:
+
+1. Stäng av Pi:n, ta ut SD-kortet och sätt det i din dator. Boot-partitionen
+   (`bootfs`, FAT32) går att läsa/skriva på vilken dator som helst.
+2. Öppna `cmdline.txt` på den partitionen (allt står på **en** rad).
+3. Ta bort token `boot=overlay` ur raden (lämna resten orört). Det stänger av
+   overlayfs så att rootfs blir skrivbar igen vid nästa boot.
+4. Sätt tillbaka kortet och starta. Nu bootar Pi:n skrivbart.
+
+`07-readonly.sh` aktiverar endast `enable_overlayfs` (inte `enable_bootro`), så
+boot-partitionen är alltid skrivbar och den här metoden fungerar.
+
+**Fixa grundorsaken när den bootat:**
+```bash
+cd ~/rpi-kiosk
+git pull
+sudo bash deploy.sh --update   # stänger av overlayfs automatiskt, kör om, återaktiverar read-only
+```
+
+**Vanliga loop-orsaker:**
+- `Persistent=true` på en systemd-timer + overlayfs (tidsstämplar lever på tmpfs
+  och raderas vid boot → timern tror den missade och kör direkt). Åtgärdat:
+  `kiosk-reboot.timer` saknar numera `Persistent=true`.
+- Misslyckad fstab-montering → emergency mode. Åtgärdat: `/mnt/rw-root` och
+  `/home`-bind använder `nofail`.
+
+---
+
 ## Chromium startar inte
 
 **Kontrollera loggar:**

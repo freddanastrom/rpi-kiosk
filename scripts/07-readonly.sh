@@ -28,8 +28,9 @@ if ! grep -q "/mnt/rw-root" /etc/fstab; then
     cat >> /etc/fstab <<EOF
 
 # Persistent hemkatalog — kringgår overlayfs så att ~/config.env m.m. är skrivbara
-PARTUUID=${ROOT_PARTUUID}  /mnt/rw-root  ext4  defaults,noatime  0  0
-/mnt/rw-root/home          /home         none  bind               0  0
+# nofail: ett monteringsfel får aldrig blockera boot (undviker emergency mode / bootloop)
+PARTUUID=${ROOT_PARTUUID}  /mnt/rw-root  ext4  defaults,noatime,nofail  0  0
+/mnt/rw-root/home          /home         none  bind,nofail              0  0
 EOF
     echo "[07] fstab: lagt till persistent /home (PARTUUID=${ROOT_PARTUUID})"
 else
