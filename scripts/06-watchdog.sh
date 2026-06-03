@@ -58,6 +58,12 @@ Type=oneshot
 ExecStart=/sbin/reboot
 EOF
 
+# VARNING: Lägg ALDRIG till Persistent=true här (och använd inte cron @reboot för
+# omstart) när read-only/overlayroot är aktivt. systemd:s "senast körd"-stämpel
+# (/var/lib/systemd/timers) ligger på overlay-tmpfs och raderas vid varje boot.
+# Med Persistent=true tror systemd då att 05:00-omstarten missades och kör reboot
+# direkt vid boot → omedelbar bootloop. Utan Persistent fyrar timern bara vid
+# nästa faktiska OnCalendar-träff, vilket är vad vi vill. (Se troubleshooting.md.)
 cat > /etc/systemd/system/kiosk-reboot.timer <<'EOF'
 [Unit]
 Description=Daily kiosk reboot at 05:00

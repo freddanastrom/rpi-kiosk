@@ -82,10 +82,23 @@ check_config() {
     fi
 }
 
-# ─── Overlayfs-hjälpfunktion ─────────────────────────────────────────────────
+# ─── Overlayroot-hjälpfunktioner ─────────────────────────────────────────────
 
+# Sann om rootfs just nu är en overlay (overlayroot aktivt)
 overlayfs_active() {
     findmnt -n -o FSTYPE / 2>/dev/null | grep -q "^overlay$"
+}
+
+# Inaktivera overlayroot beständigt. När overlay är aktivt ligger den synliga
+# /etc/overlayroot.conf på tmpfs — ändringar där försvinner vid omstart. Vi måste
+# skriva till den RIKTIGA rootfs:en: i första hand via /mnt/rw-root (som 07 redan
+# monterar rw), annars via overlayroot-chroot som monterar underliggande root.
+disable_overlayroot() {
+    if mountpoint -q /mnt/rw-root 2>/dev/null; then
+        echo 'overlayroot=""' > /mnt/rw-root/etc/overlayroot.conf
+    else
+        overlayroot-chroot sh -c 'echo overlayroot=\"\" > /etc/overlayroot.conf'
+    fi
 }
 
 # ─── Tjänstomstart efter uppdatering ─────────────────────────────────────────
@@ -213,9 +226,9 @@ run_update() {
     # ─── Overlayfs-kontroll ───────────────────────────────────────────────────
     if overlayfs_active; then
         echo ""
-        echo "Read-only läge (overlayfs) är aktivt."
+        echo "Read-only läge (overlayroot) är aktivt."
         echo "Inaktiverar för att tillåta skrivning till SD-kortet..."
-        raspi-config nonint disable_overlayfs
+        disable_overlayroot
         echo ""
         echo "Read-only inaktiverat. Starta om och kör sedan samma kommando igen:"
         echo "  sudo ./deploy.sh --update ${requested_modules[*]}"
