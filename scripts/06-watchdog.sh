@@ -49,9 +49,18 @@ EOF
 echo "[06] Chromium-policy: TranslateEnabled=false"
 
 # ─── Daglig omstart 05:00 via systemd timer ──────────────────────────────────
+# ConditionUptime=900: kör BARA reboot om systemet varit uppe ≥ 15 min. Detta är
+# det centrala skyddet mot bootloop. Raspberry Pi saknar RTC, och under
+# read-only/overlayroot ligger /var/lib/systemd/timesync på tmpfs och raderas vid
+# varje boot → klockan startar på image-datumet och hoppar framåt när NTP synkar
+# strax efter boot. Hoppar väggklockan förbi 05:00 anser systemd att timern ska
+# fyra → omedelbar reboot → klockan nollställs → loop. Uptime-villkoret suppimerar
+# den spök-fyrningen (sker ~1–2 min efter boot); den riktiga 05:00-omstarten har
+# alltid många timmars uptime och påverkas inte. (Se troubleshooting.md.)
 cat > /etc/systemd/system/kiosk-reboot.service <<'EOF'
 [Unit]
 Description=Daily kiosk reboot
+ConditionUptime=900
 
 [Service]
 Type=oneshot
@@ -59,11 +68,8 @@ ExecStart=/sbin/reboot
 EOF
 
 # VARNING: Lägg ALDRIG till Persistent=true här (och använd inte cron @reboot för
-# omstart) när read-only/overlayroot är aktivt. systemd:s "senast körd"-stämpel
-# (/var/lib/systemd/timers) ligger på overlay-tmpfs och raderas vid varje boot.
-# Med Persistent=true tror systemd då att 05:00-omstarten missades och kör reboot
-# direkt vid boot → omedelbar bootloop. Utan Persistent fyrar timern bara vid
-# nästa faktiska OnCalendar-träff, vilket är vad vi vill. (Se troubleshooting.md.)
+# omstart) när read-only/overlayroot är aktivt — det förvärrar bootloop-risken
+# eftersom systemd då tror att en missad 05:00-omstart ska köras direkt vid boot.
 cat > /etc/systemd/system/kiosk-reboot.timer <<'EOF'
 [Unit]
 Description=Daily kiosk reboot at 05:00

@@ -26,10 +26,15 @@ Vill du stänga av read-only permanent istället: `sudo sed -i 's/^overlayroot=.
 och ta bort eventuell `overlayroot=`-token ur `cmdline.txt`.
 
 **Vanliga loop-orsaker:**
-- `Persistent=true` på en systemd-timer (eller cron `@reboot`-omstart) + overlay:
-  tidsstämplar lever på tmpfs och raderas vid boot → timern tror den missade och
-  kör reboot direkt vid varje boot. Åtgärdat: `kiosk-reboot.timer` saknar
-  `Persistent=true` och har en varningskommentar i `06-watchdog.sh`.
+- **Klockhopp + daglig omstart (huvudorsaken).** Pi saknar RTC. Under overlayroot
+  ligger `/var/lib/systemd/timesync/clock` på tmpfs och raderas vid boot → klockan
+  startar på image-datumet och hoppar framåt när NTP synkar strax efter boot.
+  Hoppar väggklockan förbi `OnCalendar=05:00` fyrar `kiosk-reboot.timer` direkt →
+  reboot → klockan nollställs → loop. Detta sker oavsett `Persistent`. Åtgärdat:
+  `kiosk-reboot.service` har `ConditionUptime=900`, så reboot körs bara om uptime
+  ≥ 15 min — spök-fyrningen strax efter boot suppimeras.
+- `Persistent=true` på en systemd-timer (eller cron `@reboot`-omstart) förvärrar
+  detta. Åtgärdat: `kiosk-reboot.timer` saknar `Persistent=true`.
 - Misslyckad fstab-montering → emergency mode. Åtgärdat: `/mnt/rw-root` och
   `/home`-bind använder `nofail`.
 
